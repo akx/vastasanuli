@@ -7,6 +7,8 @@ from typing import Iterable, List, Set
 
 from playwright.sync_api import Page, sync_playwright
 
+LETTER_COUNT_CHOICES = (5, 6)
+
 screencast_mode = bool(os.environ.get("SCREENCAST"))
 
 sanuli_letters = set("abcdefghijklmnopqrstuvwxyzåäö")
@@ -15,13 +17,11 @@ fi_freq = {
 }  # https://jkorpela.fi/kielikello/kirjtil.html
 
 with open("words.txt", encoding="utf-8") as wl_file:
-    words = [
+    all_words = [
         w.strip().lower()
         for w in wl_file
-        if len(w.strip()) == 5 and set(w.strip()) <= sanuli_letters
+        if len(w.strip()) in LETTER_COUNT_CHOICES and set(w.strip()) <= sanuli_letters
     ]
-
-good_start_words = sorted(w for w in words if len(set(w)) == 5)
 
 
 class Win(Exception):
@@ -58,7 +58,7 @@ class Cell:
         return "absent" in self.classes
 
 
-def get_rows(page) -> List[List[Cell]]:
+def get_rows(page: Page, *, n_letters: int) -> List[List[Cell]]:
     return [
         [
             Cell(
@@ -67,7 +67,7 @@ def get_rows(page) -> List[List[Cell]]:
             )
             for cell in row.query_selector_all(".tile")
         ]
-        for row in page.query_selector_all(".row")
+        for row in page.query_selector_all(f".row-{n_letters}")
     ]
 
 
@@ -83,8 +83,8 @@ def enter_word(page: Page, word: str) -> bool:
     return True
 
 
-def clear_entry(page: Page) -> None:
-    for x in range(5):
+def clear_entry(page: Page, *, n_letters: int) -> None:
+    for x in range(n_letters):
         page.click('.keyboard-button:has-text("⌫")')
 
 
@@ -99,7 +99,13 @@ def check_win_state(page: Page) -> None:
         raise Win()
 
 
-def infer_next_options(rows: List[List[Cell]]) -> Iterable[str]:
+def choose_game(page: Page, *, n_letters: int) -> None:
+    page.click("text=≡")
+    page.click(f"text={n_letters} MERKKIÄ")
+    page.click("text=≡")
+
+
+def infer_next_options(rows: List[List[Cell]], *, n_letters: int) -> Iterable[str]:
     known_indexes = {}
     present_letters = set()
     forbidden_letters = set()
@@ -121,14 +127,17 @@ def infer_next_options(rows: List[List[Cell]]) -> Iterable[str]:
     forbidden_letters -= set(known_indexes.values())
     forbidden_letters -= present_letters
 
-    if len(known_indexes) == 5:
+    if len(known_indexes) == n_letters:
         raise Win("".join(c for (i, c) in sorted(known_indexes.items())))
 
     print(f"{known_indexes=}")
     print(f"{present_letters=}")
     print(f"{forbidden_letters=}")
 
-    for word in words:
+    for word in all_words:
+        if len(word) != n_letters:
+            continue
+
         if known_indexes and not all(word[i] == l for i, l in known_indexes.items()):
             continue
         wset = set(word)
@@ -146,26 +155,34 @@ def score_word(word: str) -> float:
     return freq_sum * entropy
 
 
-def play(page: Page) -> None:
+@lru_cache()
+def get_start_words(n: int):
+    return sorted(w for w in all_words if len(set(w)) == n)
+
+
+def play(page: Page, *, n_letters: int) -> None:
     words_attempted = set()
     while True:
-        rows = get_rows(page)
+        print("Getting rows...")
+        rows = get_rows(page, n_letters=n_letters)
         if not rows:  # may still be loading
             continue
 
         weights = None
 
         if all(c.empty for c in rows[0]):  # empty first row, so pick a start word
-            word_cands = good_start_words
+            word_cands = get_start_words(n_letters)
         else:
-            word_cands = list(set(infer_next_options(rows)) - words_attempted)
+            word_cands = list(
+                set(infer_next_options(rows, n_letters=n_letters)) - words_attempted
+            )
             weights = [score_word(word) for word in word_cands]
 
         check_win_state(page)
 
         if not word_cands:
             print("No word candidates - trying random words instead...")
-            word_cands = words
+            word_cands = [w for w in all_words if len(w) == n_letters]
             weights = None
 
         print(f"{len(word_cands)} word candidates, attempted: {words_attempted}")
@@ -177,7 +194,7 @@ def play(page: Page) -> None:
             words_attempted.add(word)
             if enter_word(page, word):
                 break
-            clear_entry(page)
+            clear_entry(page, n_letters=n_letters)
 
 
 def countdown(n=3):
@@ -188,6 +205,8 @@ def countdown(n=3):
 
 
 def main():
+    n_letters = int(os.environ.get("N_LETTERS", 5))
+    assert n_letters in LETTER_COUNT_CHOICES
     with sync_playwright() as p:
         browser = p.firefox.launch(headless=False)
 
@@ -195,12 +214,14 @@ def main():
         page.goto("https://sanuli.fi/")
         page.wait_for_load_state("load")
 
+        choose_game(page, n_letters=n_letters)
+
         if screencast_mode:
             countdown()
 
         while True:
             try:
-                play(page)
+                play(page, n_letters=n_letters)
             except (Win, Loss) as ex:
                 print(f"---> {ex!r}")
             except KeyboardInterrupt:
