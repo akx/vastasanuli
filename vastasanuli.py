@@ -2,6 +2,7 @@ import dataclasses
 import os
 import random
 import time
+from collections import defaultdict
 from functools import lru_cache
 from typing import Iterable, List, Set
 
@@ -109,6 +110,7 @@ def infer_next_options(rows: List[List[Cell]], *, n_letters: int) -> Iterable[st
     known_indexes = {}
     present_letters = set()
     forbidden_letters = set()
+    known_unindexes = defaultdict(set)
 
     for y, row in enumerate(rows):
         if all(c.empty for c in row):
@@ -122,6 +124,7 @@ def infer_next_options(rows: List[List[Cell]], *, n_letters: int) -> Iterable[st
                 present_letters.add(cell.content)
             elif cell.absent:
                 forbidden_letters.add(cell.content)
+                known_unindexes[x].add(cell.content)
 
     # remove known good values from forbidden letters
     forbidden_letters -= set(known_indexes.values())
@@ -130,15 +133,18 @@ def infer_next_options(rows: List[List[Cell]], *, n_letters: int) -> Iterable[st
     if len(known_indexes) == n_letters:
         raise Win("".join(c for (i, c) in sorted(known_indexes.items())))
 
-    print(f"{known_indexes=}")
-    print(f"{present_letters=}")
     print(f"{forbidden_letters=}")
+    print(f"{known_indexes=}")
+    print(f"{known_unindexes=}")
+    print(f"{present_letters=}")
 
     for word in all_words:
         if len(word) != n_letters:
             continue
 
         if known_indexes and not all(word[i] == l for i, l in known_indexes.items()):
+            continue
+        if known_unindexes and any(word[i] in ls for i, ls in known_unindexes.items()):
             continue
         wset = set(word)
         if wset & forbidden_letters:  # has some forbidden letters
