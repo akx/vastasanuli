@@ -1,6 +1,6 @@
 # Vastasanuli
 
-Vastasanuli pelaa [SANULI](https://sanuli.fi/) -peliä.
+Vastasanuli pelaa [SANULI](https://sanuli.fi/) ([@Cadiac/sanuli](https://github.com/Cadiac/sanuli)) -peliä.
 
 Se ei aina voita.
 
