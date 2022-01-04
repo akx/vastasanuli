@@ -102,8 +102,8 @@ def check_win_state(page: Page) -> None:
 
 def choose_game(page: Page, *, n_letters: int) -> None:
     page.click("text=≡")
+    time.sleep(.5)
     page.click(f"text={n_letters} MERKKIÄ")
-    page.click("text=≡")
 
 
 def infer_next_options(rows: List[List[Cell]], *, n_letters: int) -> Iterable[str]:
