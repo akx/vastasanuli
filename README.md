@@ -6,7 +6,7 @@ Se ei aina voita.
 
 ## Käyttö
 
-* Tarttet Pythonin (3.6+).
+* Tarttet Pythonin (3.8+).
 * Aja `make` (tai lataa `words.txt` [muualta](https://github.com/akx/fi-words/))
 * Asentele vaadittavat paketit (`playwright`) requirements.in:stä tai requirements.txt:stä.
 * Aja `playwright install`.
