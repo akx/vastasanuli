@@ -11,3 +11,4 @@ Se ei aina voita.
 * Asentele vaadittavat paketit (`playwright`) requirements.in:stä tai requirements.txt:stä.
 * Aja `playwright install`.
 * Aja `vastasanuli.py` kovaa.
+  `-n`-argumentti määrittää, pelaako Vastasanuli 5- vai 6-kirjaimista peliä. (Ks. `--help`.)

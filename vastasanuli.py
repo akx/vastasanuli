@@ -1,3 +1,4 @@
+import argparse
 import dataclasses
 import os
 import random
@@ -100,10 +101,13 @@ def check_win_state(page: Page) -> None:
         raise Win()
 
 
-def choose_game(page: Page, *, n_letters: int) -> None:
+def choose_game(page: Page, *, n_letters: int, waterfall=False) -> None:
     page.click("text=≡")
     time.sleep(.5)
     page.click(f"text={n_letters} MERKKIÄ")
+    page.click("text=≡")
+    time.sleep(.5)
+    page.click(f"text={'KYLLÄ' if waterfall else 'EI'}")
 
 
 def infer_next_options(rows: List[List[Cell]], *, n_letters: int) -> Iterable[str]:
@@ -211,7 +215,12 @@ def countdown(n=3):
 
 
 def main():
-    n_letters = int(os.environ.get("N_LETTERS", 5))
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--n-letters", "-n", type=int, default=5)
+    ap.add_argument("--waterfall", default=False, action="store_true")
+    args = ap.parse_args()
+    n_letters = args.n_lettes
+    waterfall = bool(args.waterfall)
     assert n_letters in LETTER_COUNT_CHOICES
     with sync_playwright() as p:
         browser = p.firefox.launch(headless=False)
@@ -220,7 +229,7 @@ def main():
         page.goto("https://sanuli.fi/")
         page.wait_for_load_state("load")
 
-        choose_game(page, n_letters=n_letters)
+        choose_game(page, n_letters=n_letters, waterfall=waterfall)
 
         if screencast_mode:
             countdown()
@@ -232,8 +241,9 @@ def main():
                 print(f"---> {ex!r}")
             except KeyboardInterrupt:
                 break
-            time.sleep(0.5)
+            time.sleep(0.75)
             new_game(page)
+            time.sleep(0.75)
             continue
 
 
